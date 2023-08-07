@@ -1,44 +1,31 @@
-use elliptic_curve::{Field, Group};
-use k256;
-// use rand::Rng;
-use std::ops::Mul;
-
-// const G: ProjectivePoint = ProjectivePoint::GENERATOR;
-
-// pub fn generate_private_key() -> Scalar {
-//     let mut rng = rand::thread_rng();
-//     let sk = Scalar::random(&mut rng);
-//     sk
-// }
-
-// pub fn generate_public_key(sk: Scalar) -> ProjectivePoint {
-//     G * sk
-// }
-
-// pub fn generate_secret(sk: Scalar, pk: ProjectivePoint) -> ProjectivePoint {
-//     pk * sk
-// }
+use elliptic_curve::{Field, Group, PrimeField};
 
 pub trait ECDHGroup {
-    type G: Group;
+    type Scalar: PrimeField;
 
-    fn generate_private_key2() -> <Self::G as Group>::Scalar {
-        let rng = rand::thread_rng();
-        <<Self::G as Group>::Scalar as Field>::random(rng)
-    }
+    fn generate_private_key() -> Self::Scalar;
 
-    fn generate_public_key2(sk: <Self::G as Group>::Scalar) -> Self::G {
-        <Self::G as Group>::generator().mul(sk)
-    }
+    fn generate_public_key(sk: Self::Scalar) -> Self;
 
-    fn generate_secret2(sk: <Self::G as Group>::Scalar, pk: Self::G) -> Self::G {
-        pk.mul(sk)
-    }
+    fn generate_secret(sk: Self::Scalar, pk: Self) -> Self;
 }
 
-// impl ECDHGroup for k256::ProjectivePoint {
-//     type G = k256::
-// }
+impl<T: Group> ECDHGroup for T {
+    type Scalar = T::Scalar;
+
+    fn generate_private_key() -> Self::Scalar {
+        let rng = rand::thread_rng();
+        <Self::Scalar as Field>::random(rng)
+    }
+
+    fn generate_public_key(sk: Self::Scalar) -> Self {
+        Self::generator() * sk
+    }
+
+    fn generate_secret(sk: Self::Scalar, pk: Self) -> Self {
+        pk * sk
+    }
+}
 
 #[cfg(test)]
 mod test {
