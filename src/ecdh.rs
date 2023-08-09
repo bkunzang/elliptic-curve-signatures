@@ -30,25 +30,25 @@ impl<T: Group> ECDHGroup for T {
 #[cfg(test)]
 mod test {
     use super::*;
+    use k256::ProjectivePoint;
 
-    // #[test]
-    // fn ecdh_test() {
-    //     for _ in 1..100 {
-    //         ecdh_test_aux()
-    //     }
-    // }
+    #[test]
+    fn ecdh_test() {
+        for _ in 1..100 {
+            ecdh_test_aux()
+        }
+    }
 
-    //     fn ecdh_test_aux() {
-    //         let sk_a = generate_private_key();
-    //         let pk_a = generate_public_key(sk_a);
+    fn ecdh_test_aux() {
+        let sk_a = ProjectivePoint::generate_private_key();
+        let pk_a = ProjectivePoint::generate_public_key(sk_a);
 
-    //         let sk_b = generate_private_key();
-    //         let pk_b = generate_public_key(sk_b);
+        let sk_b = ProjectivePoint::generate_private_key();
+        let pk_b = ProjectivePoint::generate_public_key(sk_b);
 
-    //         let secret_a = generate_secret(sk_a, pk_b);
-    //         let secret_b = generate_secret(sk_b, pk_a);
+        let secret_a = ProjectivePoint::generate_secret(sk_a, pk_b);
+        let secret_b = ProjectivePoint::generate_secret(sk_b, pk_a);
 
-    //         assert_eq!(secret_a, secret_b);
-    //     }
-    // }
+        assert_eq!(secret_a, secret_b);
+    }
 }
