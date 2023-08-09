@@ -14,9 +14,12 @@ pub trait ECDSAGroup {
 }
 
 pub trait CurveGroup: Group {
-    fn x(self) -> Self::Scalar;
-    fn y(self) -> Self::Scalar;
-    fn z(self) -> Self::Scalar;
+    type PointScalar: PrimeField;
+    fn x(self) -> Self::PointScalar;
+    fn y(self) -> Self::PointScalar;
+    fn z(self) -> Self::PointScalar;
+
+    fn convert(x: Self::PointScalar) -> Self::Scalar;
 }
 
 // Hash function is incomplete
@@ -42,8 +45,8 @@ fn hash<T: Group>(message: &str) -> T::Scalar {
     scalar // TODO: Generate test vectors from the Sage script and compare with this output
 }
 // int.from_bytes(hash)
-impl<T: CurveGroup> ECDSAGroup for T {
-    type Scalar = T::Scalar;
+impl<T: CurveGroup + Group> ECDSAGroup for T {
+    type Scalar = <T as Group>::Scalar;
     fn generate_private_key() -> Self::Scalar {
         let rng = rand::thread_rng();
         <Self::Scalar as Field>::random(rng)
@@ -61,7 +64,7 @@ impl<T: CurveGroup> ECDSAGroup for T {
         // Check that k != 0
         assert!(k.is_zero().unwrap_u8() == 0);
         let point = Self::generator() * k;
-        let r = point.x();
+        let r = <Self as CurveGroup>::convert(point.x());
         let s = k.invert().unwrap() * (z + r * sk);
         return (r, s);
     }
@@ -74,6 +77,6 @@ impl<T: CurveGroup> ECDSAGroup for T {
         let u1 = z * s_inv;
         let u2 = r * s_inv;
         let point = Self::generator() * u1 + public_key * u2;
-        return point.x() == r;
+        return <Self as CurveGroup>::convert(point.x()) == r;
     }
 }
