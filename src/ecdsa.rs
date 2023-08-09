@@ -24,18 +24,24 @@ fn hash<T: Group>(message: &str) -> T::Scalar {
     let mut hasher = Sha256::new();
     hasher.update(message);
     let hash = hasher.finalize();
-    let mut scalars: Vec<T::Scalar> = Vec::new();
-    let a: u128;
-    for i in hash.chunks(16) {
-        let bytes_array = i.try_into().unwrap();
-        let a = u128::from_le_bytes(bytes_array);
-        let a = PrimeField::from_u128(a);
-        scalars.push(a);
+    let mut scalar = <T::Scalar as Field>::ZERO;
+    for byte in hash {
+        // TODO: Maybe this is big endian instead of little endian?
+        scalar *= <T::Scalar as From<u64>>::from(256); // TODO: Maybe do this by doubling?
+        scalar += <T::Scalar as From<u64>>::from(byte as u64)
     }
+    // let mut scalars: Vec<T::Scalar> = Vec::new();
+    // let a: u128;
+    // for i in hash.chunks(16) {
+    //     let bytes_array = i.try_into().unwrap();
+    //     let a = u128::from_le_bytes(bytes_array);
+    //     let a = PrimeField::from_u128(a);
+    //     scalars.push(a);
+    // }
     //Todo: create scalar from u128s/bytes
-    todo!()
+    scalar // TODO: Generate test vectors from the Sage script and compare with this output
 }
-
+// int.from_bytes(hash)
 impl<T: CurveGroup> ECDSAGroup for T {
     type Scalar = T::Scalar;
     fn generate_private_key() -> Self::Scalar {
