@@ -37,19 +37,15 @@ pub trait CurveGroup: Group {
             x = x * Self::PointScalar::TWO_INV;
         }
 
-        bits.reverse();
-
+        let mut binary_place = Self::Scalar::ONE;
         let mut res = Self::Scalar::ZERO;
 
         for bit in bits {
-            res = res.double();
-
             if bit {
-                res += Self::Scalar::ONE;
-            };
+                res += binary_place;
+            }
+            binary_place.double();
         }
-
-        res
     }
 }
 
