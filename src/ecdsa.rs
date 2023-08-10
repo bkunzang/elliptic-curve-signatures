@@ -19,7 +19,38 @@ pub trait CurveGroup: Group {
     fn y(self) -> Self::PointScalar;
     fn z(self) -> Self::PointScalar;
 
-    fn convert(x: Self::PointScalar) -> Self::Scalar;
+    fn convert(mut x: Self::PointScalar) -> Self::Scalar {
+        let num_bits = Self::PointScalar::NUM_BITS as usize;
+
+        let mut bits = Vec::with_capacity(num_bits);
+
+        // Populate `bits` with the little-endian bits of `x`.
+        // This is equivalent to `PrimeFieldBits::to_le_bits()`.
+        for _ in 0..num_bits {
+            let bit: bool = x.is_odd().into();
+            bits.push(bit);
+
+            if bit {
+                x = x - Self::PointScalar::ONE;
+            }
+
+            x = x * Self::PointScalar::TWO_INV;
+        }
+
+        bits.reverse();
+
+        let mut res = Self::Scalar::ZERO;
+
+        for bit in bits {
+            res = res.double();
+
+            if bit {
+                res += Self::Scalar::ONE;
+            };
+        }
+
+        res
+    }
 }
 
 // Hash function is incomplete
