@@ -1,9 +1,10 @@
 use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
-//use sha2::{Digest, Sha256};
 use elliptic_curves::hash;
 pub trait SchnorrGroup {
     type Scalar: PrimeField;
+
     fn generate_private_key() -> Self::Scalar;
+
     fn generate_public_key(sk: Self::Scalar) -> Self;
 
     fn sign(sk: Self::Scalar, message: &str) -> (Self::Scalar, Self);
@@ -24,21 +25,21 @@ impl<T: Group + GroupEncoding> SchnorrGroup for T {
 
     fn sign(sk: Self::Scalar, message: &str) -> (Self::Scalar, Self) {
         let r = Self::generate_private_key();
-        let R = Self::generate_public_key(r);
-        let R_bytes = R.to_bytes();
+        let r_point = Self::generate_public_key(r);
+        let r_point_bytes = r_point.to_bytes();
         let pk = Self::generate_public_key(sk).to_bytes();
-        let inputs = vec![message.as_bytes(), pk.as_ref(), R_bytes.as_ref()];
+        let inputs = vec![message.as_bytes(), pk.as_ref(), r_point_bytes.as_ref()];
         let hash = hash::<T>(inputs);
         let s = r + sk * hash;
-        (s, R)
+        (s, r_point)
     }
 
     fn verify(signature: (Self::Scalar, Self), pk: Self, message: &str) -> bool {
-        let (s, R) = signature;
-        let (pk_bytes, R_bytes) = (pk.to_bytes(), R.to_bytes());
-        let inputs = vec![message.as_bytes(), pk_bytes.as_ref(), R_bytes.as_ref()];
+        let (s, r_point) = signature;
+        let (pk_bytes, r_point_bytes) = (pk.to_bytes(), r_point.to_bytes());
+        let inputs = vec![message.as_bytes(), pk_bytes.as_ref(), r_point_bytes.as_ref()];
         let hash = hash::<T>(inputs);
-        return Self::generator() * s == (R + pk * hash);
+        return Self::generator() * s == (r_point + pk * hash);
     }
 }
 
