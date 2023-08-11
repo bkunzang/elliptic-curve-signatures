@@ -11,20 +11,6 @@ pub trait SchnorrGroup {
     fn verify(signature: (Self::Scalar, Self), pk: Self, message: &str) -> bool;
 }
 
-/* fn hash<T: Group>(message: &[u8], pk: &[u8], R: &[u8]) -> T::Scalar {
-    let mut hasher = Sha256::new();
-    hasher.update(message);
-    hasher.update(pk);
-    hasher.update(R);
-    let hash = hasher.finalize();
-    let mut scalar = <T::Scalar as Field>::ZERO;
-    for byte in hash {
-        scalar *= <T::Scalar as From<u64>>::from(256); // TODO: Maybe do this by doubling?
-        scalar += <T::Scalar as From<u64>>::from(byte as u64)
-    }
-    scalar
-} */
-
 impl<T: Group + GroupEncoding> SchnorrGroup for T {
     type Scalar = <Self as Group>::Scalar;
     fn generate_private_key() -> Self::Scalar {
@@ -42,7 +28,6 @@ impl<T: Group + GroupEncoding> SchnorrGroup for T {
         let R_bytes = R.to_bytes();
         let pk = Self::generate_public_key(sk).to_bytes();
         let inputs = vec![message.as_bytes(), pk.as_ref(), R_bytes.as_ref()];
-        //let (R_hash, pk_hash) = (R_bytes.as_ref(), pk.as_ref());
         let hash = hash::<T>(inputs);
         let s = r + sk * hash;
         (s, R)
@@ -53,7 +38,6 @@ impl<T: Group + GroupEncoding> SchnorrGroup for T {
         let (pk_bytes, R_bytes) = (pk.to_bytes(), R.to_bytes());
         let inputs = vec![message.as_bytes(), pk_bytes.as_ref(), R_bytes.as_ref()];
         let hash = hash::<T>(inputs);
-        //let hash = hash::<T>(message.as_bytes(), pk_bytes.as_ref(), R_bytes.as_ref());
         return Self::generator() * s == (R + pk * hash);
     }
 }
