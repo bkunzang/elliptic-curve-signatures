@@ -94,3 +94,20 @@ impl<T: CurveGroup + Group> ECDSAGroup for T {
         return <Self as CurveGroup>::convert(point.x()) == r;
     }
 }
+
+//#[cfg(test)]
+//use super::*;
+//use k256::ProjectivePoint;
+//
+
+//impl CurveGroup for ProjectivePoint {
+//type PointScalar = ProjectivePoint::FieldElement;
+//fn x(self) -> self.x;
+// fn y(self) -> self.y;
+//  fn z(self) -> self.z;
+//}
+//fn ecdsa_test_aux() {
+//let sk = ProjectivePoint::generate_private_key();
+//let pk = ProjectivePoint::generate_public_key(sk);
+//  let message = rand::thread_rng().sample_iter(&Alphanumeric).take(10).map(char::from).collect();
+//}
