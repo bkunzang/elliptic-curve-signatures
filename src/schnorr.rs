@@ -1,6 +1,6 @@
-use elliptic_curve::{Field, Group, PrimeField, group::GroupEncoding};
-use sha2::{Digest, Sha256};
-
+use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
+//use sha2::{Digest, Sha256};
+use elliptic_curves::hash;
 pub trait SchnorrGroup {
     type Scalar: PrimeField;
     fn generate_private_key() -> Self::Scalar;
@@ -11,7 +11,7 @@ pub trait SchnorrGroup {
     fn verify(signature: (Self::Scalar, Self), pk: Self, message: &str) -> bool;
 }
 
-fn hash<T: Group>(message: &[u8], pk: &[u8], R: &[u8]) -> T::Scalar {
+/* fn hash<T: Group>(message: &[u8], pk: &[u8], R: &[u8]) -> T::Scalar {
     let mut hasher = Sha256::new();
     hasher.update(message);
     hasher.update(pk);
@@ -19,12 +19,11 @@ fn hash<T: Group>(message: &[u8], pk: &[u8], R: &[u8]) -> T::Scalar {
     let hash = hasher.finalize();
     let mut scalar = <T::Scalar as Field>::ZERO;
     for byte in hash {
-        // TODO: Maybe this is big endian instead of little endian?
         scalar *= <T::Scalar as From<u64>>::from(256); // TODO: Maybe do this by doubling?
         scalar += <T::Scalar as From<u64>>::from(byte as u64)
     }
     scalar
-}
+} */
 
 impl<T: Group + GroupEncoding> SchnorrGroup for T {
     type Scalar = <Self as Group>::Scalar;
@@ -42,8 +41,9 @@ impl<T: Group + GroupEncoding> SchnorrGroup for T {
         let R = Self::generate_public_key(r);
         let R_bytes = R.to_bytes();
         let pk = Self::generate_public_key(sk).to_bytes();
+        let inputs = vec![message.as_bytes(), pk.as_ref(), R_bytes.as_ref()];
         //let (R_hash, pk_hash) = (R_bytes.as_ref(), pk.as_ref());
-        let hash = hash::<T>(message.as_bytes(), pk.as_ref(), R_bytes.as_ref());
+        let hash = hash::<T>(inputs);
         let s = r + sk * hash;
         (s, R)
     }
@@ -51,7 +51,9 @@ impl<T: Group + GroupEncoding> SchnorrGroup for T {
     fn verify(signature: (Self::Scalar, Self), pk: Self, message: &str) -> bool {
         let (s, R) = signature;
         let (pk_bytes, R_bytes) = (pk.to_bytes(), R.to_bytes());
-        let hash = hash::<T>(message.as_bytes(), pk_bytes.as_ref(), R_bytes.as_ref());
+        let inputs = vec![message.as_bytes(), pk_bytes.as_ref(), R_bytes.as_ref()];
+        let hash = hash::<T>(inputs);
+        //let hash = hash::<T>(message.as_bytes(), pk_bytes.as_ref(), R_bytes.as_ref());
         return Self::generator() * s == (R + pk * hash);
     }
 }
@@ -78,7 +80,11 @@ mod test {
     }
 
     fn get_random_message(length: usize) -> String {
-        let message: Vec<char> = rand::thread_rng().sample_iter(&Alphanumeric).take(length).map(char::from).collect();
+        let message: Vec<char> = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(length)
+            .map(char::from)
+            .collect();
         let message2 = message.into_iter().collect::<String>();
         message2
     }
