@@ -1,4 +1,4 @@
-use elliptic_curve::{Field, Group, PrimeField};
+use elliptic_curve::{Field, Group, PrimeField, group::GroupEncoding};
 use sha2::{Digest, Sha256};
 
 pub trait SchnorrGroup {
@@ -11,9 +11,11 @@ pub trait SchnorrGroup {
     fn verify(signature: (Self::Scalar, Self), pk: Self, message: &str) -> bool;
 }
 
-fn hash<T: Group>(message: &str) -> T::Scalar {
+fn hash<T: Group>(message: &[u8], pk: &[u8], R: &[u8]) -> T::Scalar {
     let mut hasher = Sha256::new();
     hasher.update(message);
+    hasher.update(pk);
+    hasher.update(R);
     let hash = hasher.finalize();
     let mut scalar = <T::Scalar as Field>::ZERO;
     for byte in hash {
@@ -24,7 +26,7 @@ fn hash<T: Group>(message: &str) -> T::Scalar {
     scalar
 }
 
-impl<T: Group> SchnorrGroup for T {
+impl<T: Group + GroupEncoding> SchnorrGroup for T {
     type Scalar = <Self as Group>::Scalar;
     fn generate_private_key() -> Self::Scalar {
         let rng = rand::thread_rng();
@@ -38,14 +40,18 @@ impl<T: Group> SchnorrGroup for T {
     fn sign(sk: Self::Scalar, message: &str) -> (Self::Scalar, Self) {
         let r = Self::generate_private_key();
         let R = Self::generate_public_key(r);
-        let hash = hash::<T>(message);
+        let R_bytes = R.to_bytes();
+        let pk = Self::generate_public_key(sk).to_bytes();
+        //let (R_hash, pk_hash) = (R_bytes.as_ref(), pk.as_ref());
+        let hash = hash::<T>(message.as_bytes(), pk.as_ref(), R_bytes.as_ref());
         let s = r + sk * hash;
         (s, R)
     }
 
     fn verify(signature: (Self::Scalar, Self), pk: Self, message: &str) -> bool {
         let (s, R) = signature;
-        let hash = hash::<T>(message);
+        let (pk_bytes, R_bytes) = (pk.to_bytes(), R.to_bytes());
+        let hash = hash::<T>(message.as_bytes(), pk_bytes.as_ref(), R_bytes.as_ref());
         return Self::generator() * s == (R + pk * hash);
     }
 }
@@ -87,7 +93,6 @@ mod test {
         assert_eq!(verifier, true);
     }
 
-    #[test]
     fn schnorr_test_false_aux() {
         let sk = ProjectivePoint::generate_private_key();
         let pk = ProjectivePoint::generate_public_key(sk);
