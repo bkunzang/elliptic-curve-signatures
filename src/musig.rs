@@ -7,7 +7,7 @@ pub trait MusigGroup: Sized {
     fn verify(signature: (Self, Self::Scalar), pk_list: Vec<Self>, message: &str);
 }
 
-fn hash_agg<T: Group + GroupEncoding> (pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
+fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
     let mut input = vec!["sig".as_bytes()];
     for i in pk_list {
         let i_bytes = i.to_bytes();
@@ -27,7 +27,12 @@ fn hash_com<T: Group + GroupEncoding>(r: T) -> <T as Group>::Scalar {
 fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &str) -> <T as Group>::Scalar {
     let x_bytes = x.to_bytes();
     let r_bytes = r.to_bytes();
-    let input = vec!["sig".as_bytes(), x_bytes.as_ref(), r_bytes.as_ref(), m.as_bytes()];
+    let input = vec![
+        "sig".as_bytes(),
+        x_bytes.as_ref(),
+        r_bytes.as_ref(),
+        m.as_bytes(),
+    ];
     return hash::<T>(input);
 }
 impl<T: Group> MusigGroup for T {
