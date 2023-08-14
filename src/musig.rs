@@ -4,11 +4,14 @@ use elliptic_curves::hash;
 pub trait MusigGroup: Sized {
     type Scalar: PrimeField;
 
-    fn verify(signature: (Self, Self::Scalar), pk_list: Vec<Self>, message: &str);
+    // TODO: finish this
+    fn verify(signature: (Self, Self::Scalar), pk_list: Vec<Self>, message: &str) -> bool;
 }
 
+
+// Domain separated hash functions for aggregation, commitment, and signature phases
 fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
-    let mut input = vec!["sig".as_bytes()];
+    let mut input = vec!["agg".as_bytes()];
     for i in pk_list {
         let i_bytes = i.to_bytes();
         input.push(i_bytes.as_ref());
@@ -35,6 +38,21 @@ fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &str) -> <T as Group>::Scal
     ];
     return hash::<T>(input);
 }
-impl<T: Group> MusigGroup for T {
+impl<T: Group + GroupEncoding> MusigGroup for T {
     type Scalar = <Self as Group>::Scalar;
+
+    //INCOMPLETE
+    fn verify(signature: (Self, Self::Scalar), pk_list: Vec<T>, message: &str) -> bool {
+        let (r, s) = signature;
+        let mut x = Self::identity();
+        for pk in pk_list {
+            // TODO: make this work
+            let a = hash_agg::<T>(pk_list, pk);
+            x += pk * a;
+        }
+
+        let c = hash_sig::<T>(x, r, message);
+
+        return Self::generator() == r + x * c;
+    }
 }
