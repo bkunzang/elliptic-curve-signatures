@@ -1,5 +1,66 @@
+use std::collections::HashMap;
+
 use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
 use elliptic_curves::hash;
+
+// Signer
+// MuSig
+// Commitment
+// Signature
+
+// round_1 -> (a_map, x)
+// round_2 -> bool
+// round_3 -> Signature
+
+enum MultiSig<G: Group> {
+    R0(MuSig<G>),
+    R1(MuSig<G>),
+    R2(MuSig<G>),
+}
+
+impl<G: Group> MultiSig<G> {
+    fn round_1(&mut self) {
+        todo!()
+    }
+    fn round_2(&mut self) {
+        todo!()
+    }
+    fn round_3(&mut self) {
+        todo!()
+    }
+    fn sign(&mut self) -> Signature<G> {
+        self.round_1();
+        self.round_2();
+        self.round_3();
+
+        self.signature
+    }
+}
+
+struct Signer<G: Group> {
+    sk: G::Scalar,
+    pk: G,
+    r: G::Scalar,
+}
+
+struct MuSig<G: Group> {
+    signers: &[Signer],
+    message: &[u8],
+    a_map: HashMap<Signer, G::Scalar>,
+    commitment_map: HashMap<Signer, Commitment>,
+    x: G,
+    signature: Option<Signature<G>>,
+}
+
+struct Commitment<G: Group> {
+    r_point: G,
+    t: G::Scalar,
+}
+
+struct Signature<G: Group> {
+    s: G::Scalar,
+    r_point: G,
+}
 
 pub trait MusigGroup: Sized {
     type Scalar: PrimeField;
@@ -7,7 +68,6 @@ pub trait MusigGroup: Sized {
     // TODO: finish this
     fn verify(signature: (Self, Self::Scalar), pk_list: Vec<Self>, message: &str) -> bool;
 }
-
 
 // Domain separated hash functions for aggregation, commitment, and signature phases
 fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
