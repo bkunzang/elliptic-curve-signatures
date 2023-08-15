@@ -1,6 +1,8 @@
 use elliptic_curve::{Field, Group};
 use sha2::{Digest, Sha256};
 
+mod musig;
+
 pub fn hash<T: Group>(inputs: Vec<&[u8]>) -> T::Scalar {
     let mut hasher = Sha256::new();
     for input in inputs {
