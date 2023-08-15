@@ -27,53 +27,55 @@ where
     G::Scalar: Hash,
 {
     fn round_1(&mut self) {
-        match self {
-            Self::R0(m) => {
-                let all_pk = m.signers.iter().map(Signer::pk).collect::<Vec<_>>();
-                // TODO: don't actually clone `all_pk` repeatedly.
-                // hash it once, then incrementally hash the unique suffix.
-                m.a_vec = m
-                    .signers
-                    .iter()
-                    .map(|signer| Some(hash_agg(all_pk.clone(), signer.pk())))
-                    .collect();
+        let Self::R0(m) = self else {
+            panic!("bro, can do no")
+        };
 
-                m.x = m
-                    .signers
-                    .iter()
-                    .zip(m.a_vec.iter())
-                    .map(|(signer, a)| signer.pk() * a.expect("missing a"))
-                    .sum();
-            }
-            _ => panic!("bro, can do no"),
-        }
+        let all_pk = m.signers.iter().map(Signer::pk).collect::<Vec<_>>();
+        // TODO: don't actually clone `all_pk` repeatedly.
+        // hash it once, then incrementally hash the unique suffix.
+        m.a_vec = m
+            .signers
+            .iter()
+            .map(|signer| Some(hash_agg(all_pk.clone(), signer.pk())))
+            .collect();
+
+        m.x = m
+            .signers
+            .iter()
+            .zip(m.a_vec.iter())
+            .map(|(signer, a)| signer.pk() * a.expect("missing a"))
+            .sum();
     }
     fn round_2(&mut self) {
-        todo!()
+        let Self::R1(m) = self else {
+            panic!("bro no, do can");
+        };
+
+        todo!("round_2");
     }
     fn round_3(&mut self) {
-        match self {
-            Self::R3(m) => {
-                let r_point = m
-                    .signers
-                    .iter()
-                    .fold(G::identity(), |acc, signer| acc + signer.r_point());
+        let Self::R3(m) = self else {
+            panic!("no can do, bro")
+        };
 
-                let c = hash_sig(m.x, r_point, m.message);
+        let r_point = m
+            .signers
+            .iter()
+            .fold(G::identity(), |acc, signer| acc + signer.r_point());
 
-                let s = m
-                    .signers
-                    .iter()
-                    .enumerate()
-                    .fold(G::Scalar::ZERO, |acc, (i, signer)| {
-                        let a = m.a_vec[i].expect("a missing");
-                        signer.s(c, a)
-                    });
+        let c = hash_sig(m.x, r_point, m.message);
 
-                m.signature = Some(Signature { s, r_point });
-            }
-            _ => panic!("no can do, bro"),
-        }
+        let s = m
+            .signers
+            .iter()
+            .enumerate()
+            .fold(G::Scalar::ZERO, |acc, (i, signer)| {
+                let a = m.a_vec[i].expect("a missing");
+                signer.s(c, a)
+            });
+
+        m.signature = Some(Signature { s, r_point });
     }
     fn sign(&mut self) -> Option<Signature<G>> {
         self.round_1();
