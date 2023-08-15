@@ -13,23 +13,38 @@ use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
 // round_2 -> bool
 // round_3 -> Signature
 
-#[derive(Debug, Clone)]
-enum MultiSig<'a, G: Group + GroupEncoding> {
-    R0(MuSig<'a, G>),
-    R1(MuSig<'a, G>),
-    R2(MuSig<'a, G>),
-    R3(MuSig<'a, G>),
-}
+struct R0<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
+struct R1<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
+struct R2<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
+struct R3<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
 
-impl<'a, G: Group + GroupEncoding> MultiSig<'a, G>
+impl<'a, G: Group + GroupEncoding> From<&'a mut MuSig<'a, G>> for R0<'a, G>
 where
     G: Hash,
     G::Scalar: Hash,
 {
-    fn round_1(&mut self) {
-        let Self::R0(m) = self else {
-            panic!("bro, can do no")
-        };
+    fn from(m: &'a mut MuSig<'a, G>) -> Self {
+        Self(m)
+    }
+}
+
+impl<'a, G: Group + GroupEncoding> MuSig<'a, G>
+where
+    G: Hash,
+    G::Scalar: Hash,
+{
+    fn sign(&'a mut self) -> Signature<G> {
+        R0::from(self).sign().clone()
+    }
+}
+
+impl<'a, G: Group + GroupEncoding> R0<'a, G>
+where
+    G: Hash,
+    G::Scalar: Hash,
+{
+    fn round_1(self) -> R1<'a, G> {
+        let m: &mut _ = self.0;
 
         let all_pk = m.signers.iter().map(Signer::pk).collect::<Vec<_>>();
         // TODO: don't actually clone `all_pk` repeatedly.
@@ -46,18 +61,42 @@ where
             .zip(m.a_vec.iter())
             .map(|(signer, a)| signer.pk() * a.expect("missing a"))
             .sum();
+
+        R1(m)
     }
-    fn round_2(&mut self) {
-        let Self::R1(m) = self else {
-            panic!("bro no, do can");
-        };
+
+    fn sign(self) -> &'a Signature<G> {
+        self.round_1()
+            .round_2()
+            .round_3()
+            .0
+            .signature
+            .as_ref()
+            .expect("missing siganture")
+    }
+}
+
+impl<'a, G: Group + GroupEncoding> R1<'a, G>
+where
+    G: Hash,
+    G::Scalar: Hash,
+{
+    fn round_2(self) -> R2<'a, G> {
+        let m: &mut _ = self.0;
 
         todo!("round_2");
+
+        R2(m)
     }
-    fn round_3(&mut self) {
-        let Self::R3(m) = self else {
-            panic!("no can do, bro")
-        };
+}
+
+impl<'a, G: Group + GroupEncoding> R2<'a, G>
+where
+    G: Hash,
+    G::Scalar: Hash,
+{
+    fn round_3(self) -> R3<'a, G> {
+        let m: &mut _ = self.0;
 
         let r_point = m
             .signers
@@ -76,16 +115,8 @@ where
             });
 
         m.signature = Some(Signature { s, r_point });
-    }
-    fn sign(&mut self) -> Option<Signature<G>> {
-        self.round_1();
-        self.round_2();
-        self.round_3();
 
-        match self {
-            Self::R3(m) => m.signature.clone(),
-            _ => None,
-        }
+        R3(m)
     }
 }
 
