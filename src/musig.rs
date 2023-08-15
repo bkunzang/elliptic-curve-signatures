@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
 use crate::hash;
 use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
@@ -20,9 +21,32 @@ enum MultiSig<'a, G: Group + GroupEncoding> {
     R3(MuSig<'a, G>),
 }
 
-impl<'a, G: Group + GroupEncoding> MultiSig<'a, G> {
+impl<'a, G: Group + GroupEncoding> MultiSig<'a, G>
+where
+    G: Hash,
+    G::Scalar: Hash,
+{
     fn round_1(&mut self) {
-        todo!()
+        match self {
+            Self::R0(m) => {
+                let all_pk = m.signers.iter().map(Signer::pk).collect::<Vec<_>>();
+                // TODO: don't actually clone `all_pk` repeatedly.
+                // hash it once, then incrementally hash the unique suffix.
+                m.a_vec = m
+                    .signers
+                    .iter()
+                    .map(|signer| Some(hash_agg(all_pk.clone(), signer.pk())))
+                    .collect();
+
+                m.x = m
+                    .signers
+                    .iter()
+                    .zip(m.a_vec.iter())
+                    .map(|(signer, a)| signer.pk() * a.expect("missing a"))
+                    .sum();
+            }
+            _ => panic!("bro, can do no"),
+        }
     }
     fn round_2(&mut self) {
         todo!()
@@ -40,7 +64,11 @@ impl<'a, G: Group + GroupEncoding> MultiSig<'a, G> {
                 let s = m
                     .signers
                     .iter()
-                    .fold(G::Scalar::ZERO, |acc, signer| signer.s(c));
+                    .enumerate()
+                    .fold(G::Scalar::ZERO, |acc, (i, signer)| {
+                        let a = m.a_vec[i].expect("a missing");
+                        signer.s(c, a)
+                    });
 
                 m.signature = Some(Signature { s, r_point });
             }
@@ -59,12 +87,11 @@ impl<'a, G: Group + GroupEncoding> MultiSig<'a, G> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 struct Signer<G: Group> {
     sk: G::Scalar,
     pk: G,
     r: G::Scalar,
-    a: Option<G::Scalar>,
 }
 
 impl<G: Group> Signer<G> {
@@ -72,8 +99,11 @@ impl<G: Group> Signer<G> {
         G::generator() * self.r
     }
 
-    fn s(&self, c: G::Scalar) -> G::Scalar {
-        self.r + c * self.a.expect("missing a") * self.sk
+    fn s(&self, c: G::Scalar, a: G::Scalar) -> G::Scalar {
+        self.r + c * a * self.sk
+    }
+    fn pk(&self) -> G {
+        self.pk
     }
 }
 
@@ -81,8 +111,8 @@ impl<G: Group> Signer<G> {
 struct MuSig<'a, G: Group> {
     signers: &'a [Signer<G>],
     message: &'a [u8],
-    a_map: HashMap<Signer<G>, G::Scalar>,
-    commitment_map: HashMap<Signer<G>, Commitment<G>>,
+    a_vec: Vec<Option<G::Scalar>>,
+    commitment_vec: Vec<Option<Commitment<G>>>,
     x: G,
     signature: Option<Signature<G>>,
 }
@@ -113,6 +143,9 @@ pub trait MusigGroup: Sized {
 }
 
 // Domain separated hash functions for aggregation, commitment, and signature phases
+fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
+    todo!()
+}
 // fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
 //     let mut input = vec!["agg".as_bytes()];
 //     for i in pk_list {
