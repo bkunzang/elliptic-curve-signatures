@@ -84,8 +84,12 @@ where
     fn round_2(self) -> R2<'a, G> {
         let m: &mut _ = self.0;
 
-        todo!("round_2");
-
+        m.commitment_vec = m.signers.iter().map(|signer| signer.commit()).collect();
+        m.opened_commitment_vec = m.signers.iter().map(|signer| signer.r_point()).collect();
+        let verifier = m
+            .signers
+            .iter()
+            .map(|signer| signer.verify_all_commits(&m.opened_commitment_vec, &m.commitment_vec));
         R2(m)
     }
 }
@@ -127,7 +131,7 @@ struct Signer<G: Group> {
     r: G::Scalar,
 }
 
-impl<G: Group> Signer<G> {
+impl<G: Group + GroupEncoding> Signer<G> {
     fn r_point(&self) -> G {
         G::generator() * self.r
     }
@@ -138,6 +142,24 @@ impl<G: Group> Signer<G> {
     fn pk(&self) -> G {
         self.pk
     }
+
+    fn commit(&self) -> G::Scalar {
+        hash_com(self.r_point())
+    }
+
+    fn verify_commit(commitment: G::Scalar, r_point: G) -> bool {
+        hash_com(r_point) == commitment
+    }
+
+    fn verify_all_commits(&self, r_point_vec: &Vec<G>, commit_vec: &Vec<G::Scalar>) -> bool {
+        let verifier = commit_vec
+            .iter()
+            .zip(r_point_vec)
+            .fold(true, |acc, (commitment, r_point)| {
+                acc && Signer::<G>::verify_commit(*commitment, *r_point)
+            });
+        verifier
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -145,7 +167,8 @@ struct MuSig<'a, G: Group> {
     signers: &'a [Signer<G>],
     message: &'a [u8],
     a_vec: Vec<Option<G::Scalar>>,
-    commitment_vec: Vec<Option<Commitment<G>>>,
+    commitment_vec: Vec<G::Scalar>,
+    opened_commitment_vec: Vec<G>,
     x: G,
     signature: Option<Signature<G>>,
 }
@@ -156,12 +179,21 @@ impl<'a, G: Group> MuSig<'a, G> {
     }
 }
 
-#[derive(Debug, Clone)]
-struct Commitment<G: Group> {
+//#[derive(Debug, Clone)]
+/* struct Commitment<G: Group> {
     r_point: G,
     t: G::Scalar,
 }
 
+impl<G: Group> Commitment<G> {
+    fn open_commit(&self) -> G {
+        self.r_point
+    }
+
+    fn commitment(&self) -> G::Scalar {
+        self.t
+    }
+} */
 #[derive(Debug, Clone)]
 struct Signature<G: Group> {
     s: G::Scalar,
@@ -220,3 +252,9 @@ fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &[u8]) -> <T as Group>::Sca
 //         return Self::generator() == r + x * c;
 //     }
 // }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    fn verify_commit_test_aux() {}
+}
