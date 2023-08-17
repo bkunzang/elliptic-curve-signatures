@@ -1,8 +1,10 @@
+use crate::hash_to_scalar;
+use elliptic_curve::generic_array::GenericArray;
+use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
+use sha2::digest::generic_array::typenum::U32;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-
-use crate::hash;
-use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
 
 // Signer
 // MuSig
@@ -49,12 +51,14 @@ where
         let all_pk = m.signers.iter().map(Signer::pk).collect::<Vec<_>>();
         // TODO: don't actually clone `all_pk` repeatedly.
         // hash it once, then incrementally hash the unique suffix.
+
         m.a_vec = m
             .signers
             .iter()
             .map(|signer| Some(hash_agg(all_pk.clone(), signer.pk())))
             .collect();
 
+        //hash_agg(all_pk.clone(), signer.pk())
         m.x = m
             .signers
             .iter()
@@ -200,27 +204,81 @@ struct Signature<G: Group> {
     r_point: G,
 }
 
-pub trait MusigGroup: Sized {
+impl<G: Group> Signature<G> {
+    fn s(&self) -> G::Scalar {
+        self.s
+    }
+
+    fn r_point(&self) -> G {
+        self.r_point
+    }
+}
+
+fn verify<T: Group + GroupEncoding>(
+    signature: Signature<T>,
+    pk_list: Vec<T>,
+    message: &[u8],
+) -> bool {
+    let s = signature.s();
+    let r_point = signature.r_point();
+    let a_vec: Vec<T::Scalar> = pk_list
+        .clone()
+        .iter()
+        .map(|pk| hash_agg(pk_list.clone(), *pk))
+        .collect();
+    let x = a_vec
+        .iter()
+        .zip(pk_list)
+        .fold(T::identity(), |acc, (a, pk)| acc + pk * a);
+    let c = hash_sig(x, r_point, message);
+    T::generator() * s == r_point + x * c
+}
+
+/* pub trait MusigGroup: Sized {
     type Scalar: PrimeField;
 
     // TODO: finish this
     fn verify(signature: (Self, Self::Scalar), pk_list: Vec<Self>, message: &str) -> bool;
-}
+} */
 
 // Domain separated hash functions for aggregation, commitment, and signature phases
-fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
-    todo!()
+/* fn hash_agg_base<T: Group + GroupEncoding>(pk_list: Vec<T>) -> GenericArray<u8, U32> {
+     let pk_bytes = pk_list.iter().map(|pk| pk.to_bytes()).collect();
+     let mut hash = Sha256::new_with_prefix("agg");
+     for byte in pk_bytes {
+        hash.update(byte)
+     }
+     return hash.finalize()
 }
-// fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
-//     let mut input = vec!["agg".as_bytes()];
-//     for i in pk_list {
-//         let i_bytes = i.to_bytes();
-//         input.push(i_bytes.as_ref());
-//     }
-//     let pk_bytes = pk.to_bytes();
-//     input.push(pk_bytes.as_ref());
-//     return hash::<T>(input);
-// }
+
+fn hash_agg_final<T:Group + GroupEncoding>(base: GenericArray<u8, U32>, pk: T) -> GenericArray<> */
+
+pub fn hash<T: Group>(inputs: Vec<&[u8]>) -> T::Scalar {
+    let mut hasher = Sha256::new();
+    for input in inputs {
+        hasher.update(input)
+    }
+    let hash = hasher.finalize();
+    let mut scalar = <T::Scalar as Field>::ZERO;
+    let scalar256 = <T::Scalar as From<u64>>::from(256);
+    for byte in hash {
+        scalar *= scalar256; // TODO: Maybe do this by doubling?
+        scalar += <T::Scalar as From<u64>>::from(byte as u64)
+    }
+    scalar
+}
+
+fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
+    let mut hash = Sha256::new_with_prefix("agg");
+    let pk_list_bytes: Vec<<T as GroupEncoding>::Repr> =
+        pk_list.iter().map(|pk| pk.to_bytes()).collect();
+    for pk in pk_list_bytes {
+        hash.update(pk);
+    }
+    hash.update(pk.to_bytes());
+    let hash_scalar = hash_to_scalar::<T>(hash.finalize());
+    return hash_scalar;
+}
 
 fn hash_com<T: Group + GroupEncoding>(r: T) -> <T as Group>::Scalar {
     let r_bytes = r.to_bytes();
@@ -234,27 +292,27 @@ fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &[u8]) -> <T as Group>::Sca
     let input = vec!["sig".as_bytes(), x_bytes.as_ref(), r_bytes.as_ref(), m];
     return hash::<T>(input);
 }
-// impl<T: Group + GroupEncoding> MusigGroup for T {
-//     type Scalar = <Self as Group>::Scalar;
-
-//     //INCOMPLETE
-//     fn verify(signature: (Self, Self::Scalar), pk_list: Vec<T>, message: &str) -> bool {
-//         let (r, s) = signature;
-//         let mut x = Self::identity();
-//         for pk in pk_list {
-//             // TODO: make this work
-//             let a = hash_agg::<T>(pk_list, pk);
-//             x += pk * a;
-//         }
-
-//         let c = hash_sig::<T>(x, r, message);
-
-//         return Self::generator() == r + x * c;
-//     }
-// }
 
 #[cfg(test)]
 mod test {
+    use rand::Rng;
+
     use super::*;
-    fn verify_commit_test_aux() {}
+
+    fn generate_random_signer<T: Group + GroupEncoding>() -> Signer<T> {
+        let rng1 = rand::thread_rng();
+        let rng2 = rand::thread_rng();
+        let sk = <T::Scalar as Field>::random(rng1);
+        Signer {
+            sk: sk,
+            pk: sk * T::generator(),
+            r: <T::Scalar as Field>::random(rng2),
+        }
+    }
+    /*
+    fn verify_commit_test_aux() {
+        let signers_number = rand::thread_rng().gen_range(1..15);
+        let commitment_vec: Vec< = Vec::new();
+
+    } */
 }
