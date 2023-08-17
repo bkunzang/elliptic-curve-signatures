@@ -76,7 +76,7 @@ where
             .0
             .signature
             .as_ref()
-            .expect("missing siganture")
+            .expect("missing signature")
     }
 }
 
@@ -90,10 +90,13 @@ where
 
         m.commitment_vec = m.signers.iter().map(|signer| signer.commit()).collect();
         m.opened_commitment_vec = m.signers.iter().map(|signer| signer.r_point()).collect();
-        let verifier = m
+        let verifier: bool = m
             .signers
             .iter()
-            .map(|signer| signer.verify_all_commits(&m.opened_commitment_vec, &m.commitment_vec));
+            .map(|signer| signer.verify_all_commits(&m.opened_commitment_vec, &m.commitment_vec))
+            .fold(true, |acc, ver| acc && ver);
+
+        // TODO: Add an error type so that this can fail if `verifier == false`
         R2(m)
     }
 }
@@ -119,7 +122,7 @@ where
             .enumerate()
             .fold(G::Scalar::ZERO, |acc, (i, signer)| {
                 let a = m.a_vec[i].expect("a missing");
-                signer.s(c, a)
+                acc + signer.s(c, a)
             });
 
         m.signature = Some(Signature { s, r_point });
@@ -178,6 +181,7 @@ struct MuSig<'a, G: Group> {
 }
 
 impl<'a, G: Group> MuSig<'a, G> {
+    // TODO: Also include the message as input
     fn new(signers: &[Signer<G>]) -> Self {
         todo!()
     }
