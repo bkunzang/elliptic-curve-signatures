@@ -88,7 +88,7 @@ impl<T: CurveGroup> ECDSAGroup for T {
         let r = point.convert();
         //let r = <Self as CurveGroup>::convert(x_bytes);
         let s = k.invert().unwrap() * (z + r * sk);
-        return (r, s);
+        (r, s)
     }
 
     fn verify(signature: (Self::Scalar, Self::Scalar), message: &[u8], public_key: Self) -> bool {
@@ -100,7 +100,7 @@ impl<T: CurveGroup> ECDSAGroup for T {
         let u2 = r * s_inv;
         let point = Self::generator() * u1 + public_key * u2;
         assert!(point != Self::identity());
-        return point.convert() == r;
+        point.convert() == r
     }
 }
 
