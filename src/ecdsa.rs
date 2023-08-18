@@ -1,4 +1,4 @@
-use elliptic_curve::{Field, Group, PrimeField};
+use elliptic_curve::{Field, Group, group::GroupEncoding, PrimeField};
 use elliptic_curves::hash;
 pub trait ECDSAGroup {
     type Scalar: PrimeField;
@@ -33,6 +33,16 @@ pub trait CurveGroup: Group {
         }
         res
     }
+}
+
+fn x<T: Group + GroupEncoding>(point: T) -> T::Scalar {
+    let point_bytes  = point.to_bytes();
+    let mut x: T::Scalar;
+    for byte in point_bytes.as_ref().split_at(16).0 {
+        x *= <T::Scalar as From<u64>>::from(256); // TODO: Maybe do this by doubling?
+        x += <T::Scalar as From<u64>>::from(*byte as u64);
+    }
+    x
 }
 
 impl<T: CurveGroup + Group> ECDSAGroup for T {
