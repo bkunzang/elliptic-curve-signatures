@@ -1,9 +1,8 @@
-use elliptic_curve::{group::GroupEncoding, Field, Group, generic_array::GenericArray};
-use sha2::{Digest, Sha256};
+use elliptic_curve::{generic_array::GenericArray, group::GroupEncoding, Field, Group};
 use sha2::digest::generic_array::typenum::U32;
+use sha2::{Digest, Sha256};
 // Signer
 // MuSig
-// Commitment
 // Signature
 
 // round_1 -> (a_map, x)
@@ -169,21 +168,6 @@ impl<'a, G: Group> MuSig<'a, G> {
     }
 }
 
-//#[derive(Debug, Clone)]
-/* struct Commitment<G: Group> {
-    r_point: G,
-    t: G::Scalar,
-}
-
-impl<G: Group> Commitment<G> {
-    fn open_commit(&self) -> G {
-        self.r_point
-    }
-
-    fn commitment(&self) -> G::Scalar {
-        self.t
-    }
-} */
 #[derive(Debug, Clone)]
 struct Signature<G: Group> {
     s: G::Scalar,
@@ -220,24 +204,7 @@ fn verify<T: Group + GroupEncoding>(
     T::generator() * s == r_point + x * c
 }
 
-/* pub trait MusigGroup: Sized {
-    type Scalar: PrimeField;
-
-    // TODO: finish this
-    fn verify(signature: (Self, Self::Scalar), pk_list: Vec<Self>, message: &str) -> bool;
-} */
-
 // Domain separated hash functions for aggregation, commitment, and signature phases
-/* fn hash_agg_base<T: Group + GroupEncoding>(pk_list: Vec<T>) -> GenericArray<u8, U32> {
-     let pk_bytes = pk_list.iter().map(|pk| pk.to_bytes()).collect();
-     let mut hash = Sha256::new_with_prefix("agg");
-     for byte in pk_bytes {
-        hash.update(byte)
-     }
-     return hash.finalize()
-}
-
-fn hash_agg_final<T:Group + GroupEncoding>(base: GenericArray<u8, U32>, pk: T) -> GenericArray<> */
 
 pub fn hash<T: Group>(inputs: Vec<&[u8]>) -> T::Scalar {
     let mut hasher = Sha256::new();
@@ -364,11 +331,4 @@ mod test {
         let verifier = verify(signature, pk_list, message_altered);
         assert_eq!(verifier, false);
     }
-
-    /*
-    fn verify_commit_test_aux() {
-        let signers_number = rand::thread_rng().gen_range(1..15);
-        let commitment_vec: Vec< = Vec::new();
-
-    } */
 }
