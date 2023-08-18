@@ -1,9 +1,7 @@
 use crate::hash_to_scalar;
-use elliptic_curve::generic_array::GenericArray;
 use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
 use sha2::digest::generic_array::typenum::U32;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 // Signer
@@ -178,8 +176,17 @@ struct MuSig<'a, G: Group> {
 }
 
 impl<'a, G: Group> MuSig<'a, G> {
-    fn new(signers: &[Signer<G>]) -> Self {
-        todo!()
+    fn new(signers: &'a [Signer<G>], message: &'a [u8]) -> Self {
+        MuSig {
+            signers: signers,
+            message: message,
+            a_vec: vec![None; signers.len()],
+            commitment_vec: Vec::new(),
+            opened_commitment_vec: Vec::new(),
+            x: G::identity(),
+            signature: None
+        }
+
     }
 }
 
@@ -296,8 +303,19 @@ fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &[u8]) -> <T as Group>::Sca
 #[cfg(test)]
 mod test {
     use rand::Rng;
-
+    use rand::distributions::Alphanumeric;
     use super::*;
+    use k256::ProjectivePoint;
+
+    fn get_random_message(length: usize) -> String {
+        let message: Vec<char> = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(length)
+            .map(char::from)
+            .collect();
+        let message2 = message.into_iter().collect::<String>();
+        message2
+    }
 
     fn generate_random_signer<T: Group + GroupEncoding>() -> Signer<T> {
         let rng1 = rand::thread_rng();
@@ -305,10 +323,25 @@ mod test {
         let sk = <T::Scalar as Field>::random(rng1);
         Signer {
             sk: sk,
-            pk: sk * T::generator(),
+            pk: T::generator() * sk,
             r: <T::Scalar as Field>::random(rng2),
         }
     }
+
+    fn musig_test_aux() {
+        let message = get_random_message(10).as_bytes();
+        let num_signers = rand::thread_rng().gen_range(5..20);
+        let mut signers = Vec::new();
+        for i in 1..num_signers {
+            signers.push(generate_random_signer::<ProjectivePoint>());
+        }
+        let musig = MuSig::<ProjectivePoint>::new(&[signers], message);
+        let test = musig.sign();
+    }
+
+
+
+
     /*
     fn verify_commit_test_aux() {
         let signers_number = rand::thread_rng().gen_range(1..15);
