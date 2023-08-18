@@ -14,6 +14,7 @@ struct R1<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
 struct R2<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
 struct R3<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
 
+
 impl<'a, G: Group + GroupEncoding> From<&'a mut MuSig<'a, G>> for R0<'a, G> {
     fn from(m: &'a mut MuSig<'a, G>) -> Self {
         Self(m)
@@ -75,7 +76,11 @@ impl<'a, G: Group + GroupEncoding> R1<'a, G> {
             .fold(true, |acc, ver| acc && ver);
 
         // TODO: Add an error type so that this can fail if `verifier == false`
-        R2(m)
+        if verifier == true {
+            return R2(m);
+        } else {
+            panic!()
+        }
     }
 }
 
@@ -319,7 +324,7 @@ mod test {
         let message = message_str.as_bytes();
         let num_signers = rand::thread_rng().gen_range(5..20);
         let mut signers = Vec::new();
-        for i in 1..num_signers {
+        for _ in 1..num_signers {
             signers.push(generate_random_signer::<ProjectivePoint>());
         }
         let pk_list = signers.iter().map(|signer| signer.pk()).collect();
