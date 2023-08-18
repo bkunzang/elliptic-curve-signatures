@@ -1,5 +1,7 @@
-use elliptic_curve::{Field, Group, PrimeField};
+use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
 use elliptic_curves::hash;
+use k256::ProjectivePoint;
+
 pub trait ECDSAGroup {
     type Scalar: PrimeField;
 
@@ -12,31 +14,36 @@ pub trait ECDSAGroup {
     fn verify(signature: (Self::Scalar, Self::Scalar), message: &str, public_key: Self) -> bool;
 }
 
-pub trait CurveGroup: Group {
-    type PointScalar: PrimeField;
-    fn x(self) -> Self::PointScalar;
-    fn y(self) -> Self::PointScalar;
-    fn z(self) -> Self::PointScalar;
+pub trait CurveGroup: Group + GroupEncoding {
+    fn x(&self) -> Vec<u8>;
 
-    fn convert(mut x: Self::PointScalar) -> Self::Scalar {
-        let mut binary_place = Self::Scalar::ONE;
+    fn convert(&self) -> Self::Scalar {
+        let x_bytes = self.x();
+
+        let mut place = Self::Scalar::ONE;
         let mut res = Self::Scalar::ZERO;
 
-        for _ in 0..Self::PointScalar::NUM_BITS {
-            if x.is_odd().into() {
-                x = x - Self::PointScalar::ONE;
-                res += binary_place;
-            }
+        let mut buf = [0u8; 16];
 
-            x = x * Self::PointScalar::TWO_INV;
-            binary_place = binary_place.double();
+        let mut factor = Self::Scalar::ONE;
+        for _ in 0..128 {
+            factor = factor.double();
+        }
+
+        for chunk in x_bytes.chunks(16) {
+            buf.copy_from_slice(chunk);
+            let num = u128::from_le_bytes(buf);
+            let scalar = Self::Scalar::from_u128(num);
+            res += place * scalar;
+
+            place *= factor;
         }
         res
     }
 }
 
-impl<T: CurveGroup + Group> ECDSAGroup for T {
-    type Scalar = <T as Group>::Scalar;
+impl<T: CurveGroup> ECDSAGroup for T {
+    type Scalar = T::Scalar;
     fn generate_private_key() -> Self::Scalar {
         let rng = rand::thread_rng();
         <Self::Scalar as Field>::random(rng)
@@ -54,7 +61,9 @@ impl<T: CurveGroup + Group> ECDSAGroup for T {
         // Check that k != 0
         assert!(k.is_zero().unwrap_u8() == 0);
         let point = Self::generator() * k;
-        let r = <Self as CurveGroup>::convert(point.x());
+        let point_bytes = point.to_bytes();
+        let x_bytes = todo!();
+        let r = <Self as CurveGroup>::convert(x_bytes);
         let s = k.invert().unwrap() * (z + r * sk);
         return (r, s);
     }
@@ -67,6 +76,25 @@ impl<T: CurveGroup + Group> ECDSAGroup for T {
         let u1 = z * s_inv;
         let u2 = r * s_inv;
         let point = Self::generator() * u1 + public_key * u2;
-        return <Self as CurveGroup>::convert(point.x()) == r;
+        return point.convert() == r;
+    }
+}
+
+impl CurveGroup for ProjectivePoint {
+    fn x(&self) -> Vec<u8> {
+        let bytes = self.to_bytes();
+
+        let bytes: &[u8] = bytes.as_ref();
+
+        let size = 32;
+
+        // NOTE: this is a hack that depends on the k256 implementation so probably should not be
+        assert_eq!(bytes.as_ref().len(), 1 + 2 * size);
+        let (start, end) = (1, 1 + size);
+
+        let mut res = vec![0u8; size];
+
+        res.copy_from_slice(&bytes[start..end]);
+        res
     }
 }
