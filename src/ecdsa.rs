@@ -17,8 +17,10 @@ pub trait ECDSAGroup {
 
 // Provides methods to extract the x coordinate from an elliptic curve point and convert that coordinate into an element of the scalar field.
 pub trait CurveGroup: Group + GroupEncoding {
+    // This function must be implemented for any curve that you are using with this code (see below for an example with k256::ProjectivePoint)
     fn x(&self) -> Vec<u8>;
 
+    // Take bytes of x coordinate and convert to a scalar
     fn convert(&self) -> Self::Scalar {
         let x_bytes = self.x();
 
@@ -111,6 +113,7 @@ impl CurveGroup for ProjectivePoint {
         let size = 32;
 
         // NOTE: this is a hack that depends on the k256 implementation so probably should not be
+        // Curve points are stored as an x coordinate with a tag to indicate sign; the sign is the first byte and the x coordinate is the remaining 32 bytes.
         assert_eq!(bytes.as_ref().len(), 1 + size);
         let (start, end) = (1, 1 + size);
 
@@ -142,6 +145,14 @@ mod test {
         }
     }
 
+    fn generate_random_signer() -> (<ProjectivePoint as Group>::Scalar, ProjectivePoint) {
+        let sk = ProjectivePoint::generate_private_key();
+        let pk = ProjectivePoint::generator() * sk;
+
+        (sk, pk)
+    }
+
+    // Generates a random string to use as a message in tests
     fn get_random_message(length: usize) -> String {
         let message: Vec<char> = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -152,9 +163,10 @@ mod test {
         message2
     }
 
+    // Tests whether a random message verifies correctly for a random signer
     fn ecdsa_test_true_aux() {
-        let sk = ProjectivePoint::generate_private_key();
-        let pk = ProjectivePoint::generator() * sk;
+        let (sk, pk) = generate_random_signer();
+
         let message = get_random_message(10);
         let message_bytes = message.as_bytes();
 
@@ -165,12 +177,14 @@ mod test {
         assert_eq!(verifier, true);
     }
 
+    // Tests whether a random message replaced by a random message with a different length (cannot be the same as the original) correctly fails to verify.
     fn ecdsa_test_false_aux() {
-        let sk = ProjectivePoint::generate_private_key();
-        let pk = ProjectivePoint::generator() * sk;
+        let (sk, pk) = generate_random_signer();
+
         let message = get_random_message(10);
         let message_bytes = message.as_bytes();
-
+        
+        //Create 11 character message that must be different from the original message
         let message_altered = get_random_message(11);
         let message_altered_bytes = message_altered.as_bytes();
 
