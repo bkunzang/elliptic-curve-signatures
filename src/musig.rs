@@ -18,31 +18,19 @@ struct R1<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
 struct R2<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
 struct R3<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
 
-impl<'a, G: Group + GroupEncoding> From<&'a mut MuSig<'a, G>> for R0<'a, G>
-where
-    G: Hash,
-    G::Scalar: Hash,
-{
+impl<'a, G: Group + GroupEncoding> From<&'a mut MuSig<'a, G>> for R0<'a, G> {
     fn from(m: &'a mut MuSig<'a, G>) -> Self {
         Self(m)
     }
 }
 
-impl<'a, G: Group + GroupEncoding> MuSig<'a, G>
-where
-    G: Hash,
-    G::Scalar: Hash,
-{
+impl<'a, G: Group + GroupEncoding> MuSig<'a, G> {
     fn sign(&'a mut self) -> Signature<G> {
         R0::from(self).sign().clone()
     }
 }
 
-impl<'a, G: Group + GroupEncoding> R0<'a, G>
-where
-    G: Hash,
-    G::Scalar: Hash,
-{
+impl<'a, G: Group + GroupEncoding> R0<'a, G> {
     fn round_1(self) -> R1<'a, G> {
         let m: &mut _ = self.0;
 
@@ -78,11 +66,7 @@ where
     }
 }
 
-impl<'a, G: Group + GroupEncoding> R1<'a, G>
-where
-    G: Hash,
-    G::Scalar: Hash,
-{
+impl<'a, G: Group + GroupEncoding> R1<'a, G> {
     fn round_2(self) -> R2<'a, G> {
         let m: &mut _ = self.0;
 
@@ -96,11 +80,7 @@ where
     }
 }
 
-impl<'a, G: Group + GroupEncoding> R2<'a, G>
-where
-    G: Hash,
-    G::Scalar: Hash,
-{
+impl<'a, G: Group + GroupEncoding> R2<'a, G> {
     fn round_3(self) -> R3<'a, G> {
         let m: &mut _ = self.0;
 
@@ -126,7 +106,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 struct Signer<G: Group> {
     sk: G::Scalar,
     pk: G,
@@ -184,9 +164,8 @@ impl<'a, G: Group> MuSig<'a, G> {
             commitment_vec: Vec::new(),
             opened_commitment_vec: Vec::new(),
             x: G::identity(),
-            signature: None
+            signature: None,
         }
-
     }
 }
 
@@ -302,10 +281,17 @@ fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &[u8]) -> <T as Group>::Sca
 
 #[cfg(test)]
 mod test {
-    use rand::Rng;
-    use rand::distributions::Alphanumeric;
     use super::*;
     use k256::ProjectivePoint;
+    use rand::distributions::Alphanumeric;
+    use rand::Rng;
+
+    #[test]
+    fn musig_test_true() {
+        for _ in 1..100 {
+            musig_test_aux()
+        }
+    }
 
     fn get_random_message(length: usize) -> String {
         let message: Vec<char> = rand::thread_rng()
@@ -329,18 +315,20 @@ mod test {
     }
 
     fn musig_test_aux() {
-        let message = get_random_message(10).as_bytes();
+        let message_str = get_random_message(10);
+        let message = message_str.as_bytes();
         let num_signers = rand::thread_rng().gen_range(5..20);
         let mut signers = Vec::new();
         for i in 1..num_signers {
             signers.push(generate_random_signer::<ProjectivePoint>());
         }
-        let musig = MuSig::<ProjectivePoint>::new(&[signers], message);
-        let test = musig.sign();
+        let pk_list = signers.iter().map(|signer| signer.pk()).collect();
+        let mut musig = MuSig::<ProjectivePoint>::new(&signers[..], message);
+        let signature = musig.sign();
+
+        let verifier = verify(signature, pk_list, message);
+        assert_eq!(verifier, true);
     }
-
-
-
 
     /*
     fn verify_commit_test_aux() {
