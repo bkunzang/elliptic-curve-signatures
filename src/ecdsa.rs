@@ -1,7 +1,8 @@
 use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
 use k256::ProjectivePoint;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
+// Requires the implementations of methods to create ECDSA signatures
 pub trait ECDSAGroup {
     type Scalar: PrimeField;
 
@@ -14,6 +15,7 @@ pub trait ECDSAGroup {
     fn verify(signature: (Self::Scalar, Self::Scalar), message: &[u8], public_key: Self) -> bool;
 }
 
+// Provides methods to extract the x coordinate from an elliptic curve point and convert that coordinate into an element of the scalar field.
 pub trait CurveGroup: Group + GroupEncoding {
     fn x(&self) -> Vec<u8>;
 
@@ -42,18 +44,24 @@ pub trait CurveGroup: Group + GroupEncoding {
     }
 }
 
+// Hash a message to be signed and return a scalar.
 pub fn ecdsa_hash<T: Group>(input: &[u8]) -> T::Scalar {
     let mut hasher = Sha256::new();
     hasher.update(input);
     let hash = hasher.finalize();
+    let mut factor = T::Scalar::ONE;
+    // Create a scalar with value 2^8
+    for _ in 0..8 {
+        factor = factor.double()
+    }
     let mut scalar = <T::Scalar as Field>::ZERO;
+    // Construct a scalar from each byte
     for byte in hash {
-        scalar *= <T::Scalar as From<u64>>::from(256); // TODO: Maybe do this by doubling?
+        scalar *= factor;
         scalar += <T::Scalar as From<u64>>::from(byte as u64)
     }
     scalar
 }
-
 
 impl<T: CurveGroup> ECDSAGroup for T {
     type Scalar = T::Scalar;
@@ -82,13 +90,14 @@ impl<T: CurveGroup> ECDSAGroup for T {
     }
 
     fn verify(signature: (Self::Scalar, Self::Scalar), message: &[u8], public_key: Self) -> bool {
-        assert!(public_key != T::identity());
+        assert!(public_key != Self::identity());
         let (r, s) = signature;
         let z: Self::Scalar = ecdsa_hash::<T>(message);
         let s_inv = s.invert().unwrap();
         let u1 = z * s_inv;
         let u2 = r * s_inv;
         let point = Self::generator() * u1 + public_key * u2;
+        assert!(point != Self::identity());
         return point.convert() == r;
     }
 }
@@ -120,7 +129,7 @@ mod test {
     use rand::Rng;
 
     #[test]
-    fn ecdsa_test_true() {  
+    fn ecdsa_test_true() {
         for _ in 1..100 {
             ecdsa_test_true_aux()
         }
@@ -149,7 +158,6 @@ mod test {
         let message = get_random_message(10);
         let message_bytes = message.as_bytes();
 
-
         let signature = ProjectivePoint::sign(sk, message_bytes.as_ref());
 
         let verifier = ProjectivePoint::verify(signature, message_bytes.as_ref(), pk);
@@ -173,4 +181,3 @@ mod test {
         assert_eq!(verifier, false);
     }
 }
-
