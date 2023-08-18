@@ -1,9 +1,6 @@
-use crate::hash_to_scalar;
-use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
-use sha2::digest::generic_array::typenum::U32;
+use elliptic_curve::{group::GroupEncoding, Field, Group, generic_array::GenericArray};
 use sha2::{Digest, Sha256};
-use std::hash::{Hash, Hasher};
-
+use sha2::digest::generic_array::typenum::U32;
 // Signer
 // MuSig
 // Commitment
@@ -282,6 +279,16 @@ fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &[u8]) -> <T as Group>::Sca
     return hash::<T>(input);
 }
 
+fn hash_to_scalar<T: Group>(hash: GenericArray<u8, U32>) -> T::Scalar {
+    let mut scalar = <T::Scalar as Field>::ZERO;
+    let scalar256 = <T::Scalar as From<u64>>::from(256);
+    for byte in hash {
+        scalar *= scalar256; // TODO: Maybe do this by doubling?
+        scalar += <T::Scalar as From<u64>>::from(byte as u64)
+    }
+    scalar
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -292,7 +299,14 @@ mod test {
     #[test]
     fn musig_test_true() {
         for _ in 1..100 {
-            musig_test_aux()
+            musig_test_true_aux()
+        }
+    }
+
+    #[test]
+    fn musig_test_false() {
+        for _ in 1..100 {
+            musig_test_false_aux()
         }
     }
 
@@ -317,7 +331,23 @@ mod test {
         }
     }
 
-    fn musig_test_aux() {
+    fn musig_test_true_aux() {
+        let message_str = get_random_message(10);
+        let message = message_str.as_bytes();
+        let num_signers = rand::thread_rng().gen_range(5..20);
+        let mut signers = Vec::new();
+        for _ in 1..num_signers {
+            signers.push(generate_random_signer::<ProjectivePoint>());
+        }
+        let pk_list = signers.iter().map(|signer| signer.pk()).collect();
+        let mut musig = MuSig::<ProjectivePoint>::new(&signers[..], message);
+        let signature = musig.sign();
+
+        let verifier = verify(signature, pk_list, message);
+        assert_eq!(verifier, true);
+    }
+
+    fn musig_test_false_aux() {
         let message_str = get_random_message(10);
         let message = message_str.as_bytes();
         let num_signers = rand::thread_rng().gen_range(5..20);
@@ -329,8 +359,10 @@ mod test {
         let mut musig = MuSig::<ProjectivePoint>::new(&signers[..], message);
         let signature = musig.sign();
 
-        let verifier = verify(signature, pk_list, message);
-        assert_eq!(verifier, true);
+        let message_altered_str = get_random_message(11);
+        let message_altered = message_altered_str.as_bytes();
+        let verifier = verify(signature, pk_list, message_altered);
+        assert_eq!(verifier, false);
     }
 
     /*
