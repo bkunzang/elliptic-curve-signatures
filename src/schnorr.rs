@@ -1,15 +1,24 @@
 use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
 use elliptic_curves::hash;
+
+    /// Trait requiring functions to implement Schnorr signatures.
 pub trait SchnorrGroup {
+
+    /// Scalar type representing the scalar field of the elliptic curve being used to generate the signatures
     type Scalar: PrimeField;
 
+    /// Generates private key (random scalar)
     fn generate_private_key() -> Self::Scalar;
 
+    /// Generates public key (private key * generator)
     fn generate_public_key(sk: Self::Scalar) -> Self;
 
+    /// Creates signature given a scalar and a message
     fn sign(sk: Self::Scalar, message: &str) -> (Self::Scalar, Self);
 
+    /// Verify given a Schnorr signature, public key, and message
     fn verify(signature: (Self::Scalar, Self), pk: Self, message: &str) -> bool;
+
 }
 
 impl<T: Group + GroupEncoding> SchnorrGroup for T {
