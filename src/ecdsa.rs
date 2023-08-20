@@ -2,25 +2,31 @@ use elliptic_curve::{group::GroupEncoding, Field, Group, PrimeField};
 use k256::ProjectivePoint;
 use sha2::{Digest, Sha256};
 
-// Requires the implementations of methods to create ECDSA signatures
+/// Requires the implementations of methods to create ECDSA signatures
 pub trait ECDSAGroup {
+
+    /// Scalars modulo the order of the elliptic curve group
     type Scalar: PrimeField;
 
+    /// Generate random scalar that can be used as a private key
     fn generate_private_key() -> Self::Scalar;
 
+    /// Generate public key given secret/private key: pk = sk * generator
     fn generate_public_key(sk: Self::Scalar) -> Self;
-
+    
+    /// Create an ECDSA signature given a signer's secret key and a message to sign
     fn sign(secret_key: Self::Scalar, message: &[u8]) -> (Self::Scalar, Self::Scalar);
 
+    /// Verify a message signed using ECDSA; returns true/false depending on if the signature is valid
     fn verify(signature: (Self::Scalar, Self::Scalar), message: &[u8], public_key: Self) -> bool;
 }
 
-// Provides methods to extract the x coordinate from an elliptic curve point and convert that coordinate into an element of the scalar field.
+/// Provides methods to extract the x coordinate from an elliptic curve point and convert that coordinate into an element of the scalar field.
 pub trait CurveGroup: Group + GroupEncoding {
-    // This function must be implemented for any curve that you are using with this code (see below for an example with k256::ProjectivePoint)
+    /// Function to extract the x coordinate of an elliptic curve point as bytes. This function must be implemented for any curve that you are using with this code (see below for an example with k256::ProjectivePoint)
     fn x(&self) -> Vec<u8>;
 
-    // Take bytes of x coordinate and convert to a scalar
+    /// Take bytes of x coordinate and convert to a scalar
     fn convert(&self) -> Self::Scalar {
         let x_bytes = self.x();
 
@@ -46,7 +52,7 @@ pub trait CurveGroup: Group + GroupEncoding {
     }
 }
 
-// Hash a message to be signed and return a scalar.
+/// Hash a message to be signed and return a scalar.
 pub fn ecdsa_hash<T: Group>(input: &[u8]) -> T::Scalar {
     let mut hasher = Sha256::new();
     hasher.update(input);
@@ -145,6 +151,7 @@ mod test {
         }
     }
 
+    /// Generates a random signer (public and private keys)
     fn generate_random_signer() -> (<ProjectivePoint as Group>::Scalar, ProjectivePoint) {
         let sk = ProjectivePoint::generate_private_key();
         let pk = ProjectivePoint::generator() * sk;
@@ -152,7 +159,7 @@ mod test {
         (sk, pk)
     }
 
-    // Generates a random string to use as a message in tests
+    /// Generates a random string to use as a message in tests
     fn get_random_message(length: usize) -> String {
         let message: Vec<char> = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -163,7 +170,7 @@ mod test {
         message2
     }
 
-    // Tests whether a random message verifies correctly for a random signer
+    /// Tests whether a random message verifies correctly for a random signer
     fn ecdsa_test_true_aux() {
         let (sk, pk) = generate_random_signer();
 
@@ -177,7 +184,7 @@ mod test {
         assert_eq!(verifier, true);
     }
 
-    // Tests whether a random message replaced by a random message with a different length (cannot be the same as the original) correctly fails to verify.
+    /// Tests whether a random message replaced by a random message with a different length (cannot be the same as the original) correctly fails to verify.
     fn ecdsa_test_false_aux() {
         let (sk, pk) = generate_random_signer();
 
