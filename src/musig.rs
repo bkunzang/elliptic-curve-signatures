@@ -9,25 +9,35 @@ use sha2::{Digest, Sha256};
 // round_2 -> bool
 // round_3 -> Signature
 
+// Type state encode state of signature scheme; it is impossible to complete a signature round without all previous required rounds being completed.
+
+/// Initial signature state
 struct R0<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
+/// State after completing round 1 of the signature process
 struct R1<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
+/// State after completing round 2 of the signature process
 struct R2<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
+/// State after completing round 3 of the signature process
 struct R3<'a, G: Group + GroupEncoding>(&'a mut MuSig<'a, G>);
 
 
+
 impl<'a, G: Group + GroupEncoding> From<&'a mut MuSig<'a, G>> for R0<'a, G> {
+    /// Create R0 state from initial multi sig
     fn from(m: &'a mut MuSig<'a, G>) -> Self {
         Self(m)
     }
 }
 
 impl<'a, G: Group + GroupEncoding> MuSig<'a, G> {
+    /// Complete all stages of signing from intial setup
     fn sign(&'a mut self) -> Signature<G> {
         R0::from(self).sign().clone()
     }
 }
 
 impl<'a, G: Group + GroupEncoding> R0<'a, G> {
+    /// Round 1: Aggregate public keys, create 'a' for each signer by hashing all public keys plus each signer's individual public key and create aggregated public key
     fn round_1(self) -> R1<'a, G> {
         let m: &mut _ = self.0;
 
@@ -52,6 +62,7 @@ impl<'a, G: Group + GroupEncoding> R0<'a, G> {
         R1(m)
     }
 
+    /// Run all rounds of signing and create a signature given an initial multi sig.
     fn sign(self) -> &'a Signature<G> {
         self.round_1()
             .round_2()
@@ -64,6 +75,7 @@ impl<'a, G: Group + GroupEncoding> R0<'a, G> {
 }
 
 impl<'a, G: Group + GroupEncoding> R1<'a, G> {
+    /// Round 2: Each signer randomly generates r, a scalar, and creates R = r * generator. They compute hash_com(R) and publish this commitment. Then, all signers publicize their R and verify all commitments.
     fn round_2(self) -> R2<'a, G> {
         let m: &mut _ = self.0;
 
@@ -85,6 +97,7 @@ impl<'a, G: Group + GroupEncoding> R1<'a, G> {
 }
 
 impl<'a, G: Group + GroupEncoding> R2<'a, G> {
+    /// Round 3: Create collective R and create signature
     fn round_3(self) -> R3<'a, G> {
         let m: &mut _ = self.0;
 
@@ -211,7 +224,7 @@ fn verify<T: Group + GroupEncoding>(
 
 // Domain separated hash functions for aggregation, commitment, and signature phases
 
-pub fn hash<T: Group>(inputs: Vec<&[u8]>) -> T::Scalar {
+fn hash<T: Group>(inputs: Vec<&[u8]>) -> T::Scalar {
     let mut hasher = Sha256::new();
     for input in inputs {
         hasher.update(input)
