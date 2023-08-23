@@ -320,6 +320,7 @@ mod test {
         }
     }
 
+    /// Generate random string for testing
     fn get_random_message(length: usize) -> String {
         let message: Vec<char> = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -330,6 +331,7 @@ mod test {
         message2
     }
 
+    /// Generate random signer for testing
     fn generate_random_signer<T: Group + GroupEncoding>() -> Signer<T> {
         let rng1 = rand::thread_rng();
         let rng2 = rand::thread_rng();
@@ -340,7 +342,8 @@ mod test {
             r: <T::Scalar as Field>::random(rng2),
         }
     }
-
+    
+    /// Test that a signature verifies when it its message is passed intact through the verifier
     fn musig_test_true_aux() {
         let message_str = get_random_message(10);
         let message = message_str.as_bytes();
@@ -357,6 +360,8 @@ mod test {
         assert_eq!(verifier, true);
     }
 
+
+    /// Test that a signature fails to verify when its message is altered
     fn musig_test_false_aux() {
         let message_str = get_random_message(10);
         let message = message_str.as_bytes();
