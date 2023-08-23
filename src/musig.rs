@@ -124,6 +124,7 @@ impl<'a, G: Group + GroupEncoding> R2<'a, G> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+/// Represents a signer with a secret key, public key, and randomly generated value r
 struct Signer<G: Group> {
     sk: G::Scalar,
     pk: G,
@@ -131,25 +132,32 @@ struct Signer<G: Group> {
 }
 
 impl<G: Group + GroupEncoding> Signer<G> {
+    /// creates the point R = generator * r
     fn r_point(&self) -> G {
         G::generator() * self.r
     }
 
+    /// Creates the signer's contribution to the collective signature: r + c * a * sk
     fn s(&self, c: G::Scalar, a: G::Scalar) -> G::Scalar {
         self.r + c * a * self.sk
     }
+
+    /// Returns the signer's public key
     fn pk(&self) -> G {
         self.pk
     }
 
+    /// Returns hash_com of the signer's R point
     fn commit(&self) -> G::Scalar {
         hash_com(self.r_point())
     }
 
+    /// Verify a commitment to a randomly generated point like one produced by the commit function
     fn verify_commit(commitment: G::Scalar, r_point: G) -> bool {
         hash_com(r_point) == commitment
     }
 
+    /// Verify commitmentss from all other signers
     fn verify_all_commits(&self, r_point_vec: &Vec<G>, commit_vec: &Vec<G::Scalar>) -> bool {
         let verifier = commit_vec
             .iter()
@@ -162,17 +170,22 @@ impl<G: Group + GroupEncoding> Signer<G> {
 }
 
 #[derive(Debug, Clone)]
+
+/// Represents a signature process with signers, a message, a vector of 'a' values, commitments, opened commitments, a collective public key, and a signature.
 struct MuSig<'a, G: Group> {
     signers: &'a [Signer<G>],
     message: &'a [u8],
     a_vec: Vec<Option<G::Scalar>>,
     commitment_vec: Vec<G::Scalar>,
     opened_commitment_vec: Vec<G>,
+
+    /// Collective public key
     x: G,
     signature: Option<Signature<G>>,
 }
 
 impl<'a, G: Group> MuSig<'a, G> {
+    /// Create new signature process with signers and a message and no data in the other fields
     fn new(signers: &'a [Signer<G>], message: &'a [u8]) -> Self {
         MuSig {
             signers: signers,
@@ -187,21 +200,27 @@ impl<'a, G: Group> MuSig<'a, G> {
 }
 
 #[derive(Debug, Clone)]
+
+/// Represents a signature with s and R
 struct Signature<G: Group> {
     s: G::Scalar,
     r_point: G,
 }
 
 impl<G: Group> Signature<G> {
+
+    /// Returns the s value of a signature
     fn s(&self) -> G::Scalar {
         self.s
     }
 
+    /// Returns the R value of a signature
     fn r_point(&self) -> G {
         self.r_point
     }
 }
 
+/// Verify a signature given the message and a list of public keys used in signing
 fn verify<T: Group + GroupEncoding>(
     signature: Signature<T>,
     pk_list: Vec<T>,
@@ -224,6 +243,7 @@ fn verify<T: Group + GroupEncoding>(
 
 // Domain separated hash functions for aggregation, commitment, and signature phases
 
+/// Base hash function that takes in inputs and returns a scalar using Sha256
 fn hash<T: Group>(inputs: Vec<&[u8]>) -> T::Scalar {
     let mut hasher = Sha256::new();
     for input in inputs {
@@ -239,6 +259,8 @@ fn hash<T: Group>(inputs: Vec<&[u8]>) -> T::Scalar {
     scalar
 }
 
+
+/// Hash agg: Takes in a list of public keys and an individual's public key and hashes them prefixed with "agg"
 fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::Scalar {
     let mut hash = Sha256::new_with_prefix("agg");
     let pk_list_bytes: Vec<<T as GroupEncoding>::Repr> =
@@ -251,12 +273,14 @@ fn hash_agg<T: Group + GroupEncoding>(pk_list: Vec<T>, pk: T) -> <T as Group>::S
     return hash_scalar;
 }
 
+/// Creates a commitment by hashing a value prefixed with "com"
 fn hash_com<T: Group + GroupEncoding>(r: T) -> <T as Group>::Scalar {
     let r_bytes = r.to_bytes();
     let input = vec!["com".as_bytes(), r_bytes.as_ref()];
     return hash::<T>(input);
 }
 
+/// Hashes a collective public key, a collective R point, and a message prefixed with "sig"
 fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &[u8]) -> <T as Group>::Scalar {
     let x_bytes = x.to_bytes();
     let r_bytes = r.to_bytes();
@@ -264,6 +288,7 @@ fn hash_sig<T: Group + GroupEncoding>(x: T, r: T, m: &[u8]) -> <T as Group>::Sca
     return hash::<T>(input);
 }
 
+/// Converts the outputs of a hash function (GenericArray of bytes) to a scalar
 fn hash_to_scalar<T: Group>(hash: GenericArray<u8, U32>) -> T::Scalar {
     let mut scalar = <T::Scalar as Field>::ZERO;
     let scalar256 = <T::Scalar as From<u64>>::from(256);
