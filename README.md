@@ -1,7 +1,7 @@
 # TODO:
-Add content here
-* Goals of the repo
-* Usage explanations
+Implementations of algorithms in elliptic curve cryptography, including Elliptic Curve Diffie Hellman Key Exchange (ECDH), ECDSA, Schnorr Signatures, and the Musig Schnorr protocol for signature aggregation.
+
+The implementations in this repo are generic, and must be used with an external elliptic curve crate and point type, such as k256::ProjectivePoint or similar.
 
 Note: The Musig module is more of a demonstration of the protocol and does not have the interaction between signers that a real implementation would have.
 
