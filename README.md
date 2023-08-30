@@ -1,4 +1,3 @@
-# TODO:
 Implementations of algorithms in elliptic curve cryptography, including Elliptic Curve Diffie Hellman Key Exchange (ECDH), ECDSA, Schnorr Signatures, and the Musig Schnorr protocol for signature aggregation.
 
 The implementations in this repo are generic, and must be used with an external elliptic curve crate and point type, such as k256::ProjectivePoint or similar.
