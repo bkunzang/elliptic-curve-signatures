@@ -6,4 +6,5 @@ Note: The Musig module is more of a demonstration of the protocol and does not h
 
 Sources:
 ECDSA: https://en.wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm
+
 Schnorr/Musig: https://tlu.tarilabs.com/cryptography/introduction-schnorr-signatures
