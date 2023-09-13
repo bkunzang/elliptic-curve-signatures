@@ -9,3 +9,7 @@ Sources:
 ECDSA: https://en.wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm
 
 Schnorr/Musig: https://tlu.tarilabs.com/cryptography/introduction-schnorr-signatures
+
+# License
+
+MIT or Apache 2.0
